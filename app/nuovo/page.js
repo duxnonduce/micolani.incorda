@@ -84,7 +84,7 @@ function CercaCliente({ onScelto }) {
 function Nuovo() {
   const sp = useSearchParams();
   const router = useRouter();
-  const { session, profilo, toast, operatori, refresh } = useApp();
+  const { session, profilo, toast, operatori, refresh, has } = useApp();
   const [cliente, setCliente] = useState(null);
   const [racchette, setRacchette] = useState([]);
   const [righe, setRighe] = useState([nuovaRiga()]);
@@ -165,11 +165,11 @@ function Nuovo() {
     const codici = (data?.lavori || []).map((x) => x.codice).join(', ');
     toast(`Inserit${payload.length === 1 ? 'o' : 'i'} ${codici}`);
     refresh();
-    router.push(`/clienti/${cliente.id}`);
+    router.push(has('segreteria') ? `/clienti/${cliente.id}` : '/coda');
   }
 
   return (
-    <Shell title="Nuova incordatura" ruolo="segreteria">
+    <Shell title="Nuova incordatura" ruolo={['segreteria', 'incordatore']}>
       {!cliente ? <CercaCliente onScelto={setCliente} /> : (
         <section className="card">
           <div className="row between gap8">

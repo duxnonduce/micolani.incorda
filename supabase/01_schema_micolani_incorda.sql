@@ -480,7 +480,7 @@ declare
   v_codice text;
   v_out jsonb := '[]'::jsonb;
 begin
-  perform public._richiedi_ruolo('segreteria');
+  perform public._richiedi_ruolo('segreteria','incordatore');
   v_dup := public._richiesta_gia_eseguita(p_request_id);
   if v_dup is not null then return v_dup; end if;
   perform public._set_rpc();
@@ -1013,12 +1013,12 @@ create policy eventi_select on public.eventi for select to authenticated using (
 create policy conti_select on public.conti for select to authenticated using (public.is_staff());
 
 create policy clienti_select on public.clienti for select to authenticated using (public.is_staff());
-create policy clienti_insert on public.clienti for insert to authenticated with check (public.ha_ruolo('segreteria'));
+create policy clienti_insert on public.clienti for insert to authenticated with check (public.ha_ruolo('segreteria','incordatore'));
 create policy clienti_update on public.clienti for update to authenticated
   using (public.ha_ruolo('segreteria')) with check (public.ha_ruolo('segreteria'));
 
 create policy racchette_select on public.racchette for select to authenticated using (public.is_staff());
-create policy racchette_insert on public.racchette for insert to authenticated with check (public.ha_ruolo('segreteria'));
+create policy racchette_insert on public.racchette for insert to authenticated with check (public.ha_ruolo('segreteria','incordatore'));
 create policy racchette_update on public.racchette for update to authenticated
   using (public.ha_ruolo('segreteria')) with check (public.ha_ruolo('segreteria'));
 

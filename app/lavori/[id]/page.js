@@ -176,7 +176,9 @@ export default function SchedaLavoro() {
       <section className="card">
         <div className="riga-top">
           <div className="riga-tit">
-            <Link href={`/clienti/${l.cliente_id}`} style={{ fontSize: 19, fontWeight: 800 }}>{nomeCliente(l)}</Link>
+            {has('segreteria')
+              ? <Link href={`/clienti/${l.cliente_id}`} style={{ fontSize: 19, fontWeight: 800 }}>{nomeCliente(l)}</Link>
+              : <strong style={{ fontSize: 19 }}>{nomeCliente(l)}</strong>}
             <span className="muted small">{racchettaNome(l)}{l.cliente_telefono ? `, tel. ${l.cliente_telefono}` : ''}</span>
           </div>
           {l.priorita === 'urgente' && <span className="badge-urgente">Urgente</span>}

@@ -52,12 +52,12 @@ export default function Shell({ title, back, actions, children, ruolo }) {
     has('incordatore') && { href: '/coda', label: 'Coda', d: I.coda },
     { href: '/lavori', label: 'Lavori', d: I.lavori },
     has('segreteria') && { href: '/clienti', label: 'Clienti', d: I.clienti },
-    has('segreteria') && { href: '/nuovo', label: 'Nuovo', d: I.nuovo },
+    (has('segreteria') || has('incordatore')) && { href: '/nuovo', label: 'Nuovo', d: I.nuovo },
   ].filter(Boolean);
 
   const attivo = (href) => (href === '/' ? path === '/' : path.startsWith(href));
   const iniziali = ((profilo?.nome || '')[0] || '') + ((profilo?.cognome || '')[0] || '') || (profilo?.email || '?')[0];
-  const permesso = !ruolo || has(ruolo);
+  const permesso = !ruolo || [].concat(ruolo).some((r) => has(r));
 
   return (
     <div className="app">
