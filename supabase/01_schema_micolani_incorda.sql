@@ -556,23 +556,18 @@ begin
     where id = l.id;
 
   elsif (l.stato_lavoro, p_stato) in (('attesa','lavorazione'), ('attesa','pronta'), ('lavorazione','pronta')) then
-    perform public._richiedi_ruolo('incordatore');
-    if l.tensione_vert is null or l.tensione_oriz is null
-       or coalesce(l.vert_marca, l.vert_modello) is null
-       or coalesce(l.oriz_marca, l.oriz_modello) is null then
-      raise exception 'Completa corde e tensioni del lavoro % prima di procedere', l.codice;
-    end if;
+    perform public._richiedi_ruolo('incordatore','segreteria');
     update public.lavori set
       stato_lavoro = p_stato,
       iniziato_at = coalesce(iniziato_at, now()),
       iniziato_by = coalesce(iniziato_by, auth.uid()),
-      incordatore_id = coalesce(incordatore_id, auth.uid()),
+      incordatore_id = coalesce(incordatore_id, case when public.ha_ruolo('incordatore') then auth.uid() end),
       pronta_at = case when p_stato = 'pronta' then now() end,
       pronta_by = case when p_stato = 'pronta' then auth.uid() end
     where id = l.id;
 
   elsif (l.stato_lavoro, p_stato) = ('lavorazione','attesa') then
-    perform public._richiedi_ruolo('incordatore');
+    perform public._richiedi_ruolo('incordatore','segreteria');
     update public.lavori set stato_lavoro = 'attesa', iniziato_at = null, iniziato_by = null where id = l.id;
 
   elsif l.stato_lavoro = 'pronta' and p_stato in ('attesa','lavorazione') then

@@ -49,10 +49,10 @@ export default function Shell({ title, back, actions, children, ruolo }) {
 
   const voci = [
     has('segreteria') && { href: '/', label: 'Riepilogo', d: I.home },
-    has('incordatore') && { href: '/coda', label: 'Coda', d: I.coda },
+    { href: '/coda', label: 'In attesa', d: I.coda },
     { href: '/lavori', label: 'Lavori', d: I.lavori },
     has('segreteria') && { href: '/clienti', label: 'Clienti', d: I.clienti },
-    (has('segreteria') || has('incordatore')) && { href: '/nuovo', label: 'Nuovo', d: I.nuovo },
+    { href: '/nuovo', label: 'Nuova', d: I.nuovo },
   ].filter(Boolean);
 
   const attivo = (href) => (href === '/' ? path === '/' : path.startsWith(href));

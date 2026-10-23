@@ -8,8 +8,8 @@ import { erroreMsg, testo } from '@/lib/format';
 
 export default function NuovoClienteModal({ onClose, onCreato, iniziale = '' }) {
   const { toast } = useApp();
-  const parti = iniziale.trim().split(/\s+/);
-  const [c, setC] = useState({ cognome: parti[0] || '', nome: parti.slice(1).join(' '), telefono: '', note: '' });
+  const parti = iniziale.trim().split(/\s+/).filter(Boolean);
+  const [c, setC] = useState({ nome: parti.slice(1).join(' '), cognome: parti[0] || '' });
   const [busy, setBusy] = useState(false);
   const [errore, setErrore] = useState('');
   const [omonimi, setOmonimi] = useState([]);
@@ -26,14 +26,14 @@ export default function NuovoClienteModal({ onClose, onCreato, iniziale = '' }) 
 
   async function salva() {
     setErrore('');
-    if (!testo(c.nome) || !testo(c.cognome)) return setErrore('Nome e cognome sono obbligatori.');
+    if (!testo(c.nome) || !testo(c.cognome)) return setErrore('Scrivi nome e cognome.');
     setBusy(true);
     const { data: nuovo, error } = await supabase().from('clienti')
-      .insert({ nome: c.nome.trim(), cognome: c.cognome.trim(), telefono: testo(c.telefono), note: testo(c.note) })
+      .insert({ nome: c.nome.trim(), cognome: c.cognome.trim() })
       .select().single();
     setBusy(false);
     if (error) return setErrore(erroreMsg(error));
-    toast(`Cliente ${nuovo.cognome} ${nuovo.nome} creato (${nuovo.codice})`);
+    toast(`Cliente ${nuovo.nome} ${nuovo.cognome} creato`);
     onCreato(nuovo);
   }
 
@@ -41,21 +41,15 @@ export default function NuovoClienteModal({ onClose, onCreato, iniziale = '' }) 
     <Modal title="Nuovo cliente" onClose={onClose}
       footer={<button className="btn btn-primary btn-big" disabled={busy} onClick={salva}>{busy ? 'Salvataggio…' : 'Crea cliente'}</button>}>
       <div className="stack">
-        <div className="grid2">
-          <Campo label="Cognome"><input className="input" value={c.cognome} onChange={(e) => setC({ ...c, cognome: e.target.value })} autoFocus /></Campo>
-          <Campo label="Nome"><input className="input" value={c.nome} onChange={(e) => setC({ ...c, nome: e.target.value })} /></Campo>
-        </div>
-        <Campo label="Telefono" nota="Facoltativo, aiuta a distinguere gli omonimi">
-          <input className="input" type="tel" value={c.telefono} onChange={(e) => setC({ ...c, telefono: e.target.value })} />
-        </Campo>
-        <Campo label="Note interne"><input className="input" value={c.note} onChange={(e) => setC({ ...c, note: e.target.value })} placeholder="Facoltative" /></Campo>
+        <Campo label="Nome"><input className="input input-big" value={c.nome} onChange={(e) => setC({ ...c, nome: e.target.value })} autoFocus /></Campo>
+        <Campo label="Cognome"><input className="input input-big" value={c.cognome} onChange={(e) => setC({ ...c, cognome: e.target.value })} /></Campo>
         {omonimi.length > 0 && (
           <div className="avviso-arancio">
-            Esiste già un cliente con questo nome. Se è la stessa persona, usa la sua scheda:
+            C’è già un cliente con questo nome. Se è lui, toccalo:
             <div className="stack-0" style={{ marginTop: 6 }}>
               {omonimi.map((o) => (
                 <button key={o.id} type="button" className="link-btn" style={{ textAlign: 'left' }} onClick={() => onCreato(o)}>
-                  {o.cognome} {o.nome}, {o.codice}{o.telefono ? `, tel. ${o.telefono}` : ''}
+                  {o.nome} {o.cognome}{o.telefono ? `, tel. ${o.telefono}` : ''}
                 </button>
               ))}
             </div>
@@ -66,4 +60,3 @@ export default function NuovoClienteModal({ onClose, onCreato, iniziale = '' }) 
     </Modal>
   );
 }
-

@@ -64,10 +64,10 @@ export function LavoroRiga({ l, conCliente = true }) {
         <strong className="num"><Importo l={l} /></strong>
       </div>
       <Chips l={l} />
-      {(l.priorita === 'urgente' || ritardo || (!l.ritirato && l.stato_lavoro !== 'annullata')) && (
+      {(l.priorita === 'urgente' || (l.consegna_prevista && !l.ritirato && ['attesa', 'lavorazione'].includes(l.stato_lavoro))) && (
         <span className={'small ' + (ritardo ? 'rosso-t' : 'muted')}>
           {l.priorita === 'urgente' ? 'Urgente. ' : ''}
-          {!l.ritirato && l.stato_lavoro !== 'pronta' && l.stato_lavoro !== 'annullata' ? `Consegna ${consegna(l.consegna_prevista)}` : ''}
+          {l.consegna_prevista && !l.ritirato && ['attesa', 'lavorazione'].includes(l.stato_lavoro) ? `Consegna ${consegna(l.consegna_prevista)}` : ''}
         </span>
       )}
     </Link>

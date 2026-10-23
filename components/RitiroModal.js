@@ -1,12 +1,36 @@
 'use client';
 
-import Link from 'next/link';
 import { useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { centToInput, distribuisci, erroreMsg, euro, nuovoId, parseEuro, racchettaNome, testo } from '@/lib/format';
 import { useApp } from './AppProvider';
 import Attribuzioni from './Attribuzioni';
 import { Campo, Chips, Metodo, Modal } from './ui';
+
+function PrezzoVeloce({ lavoro, onFatto }) {
+  const { toast, refresh } = useApp();
+  const [v, setV] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function salva() {
+    const c = parseEuro(v);
+    if (c === null || Number.isNaN(c)) return toast('Scrivi il prezzo', 'errore');
+    setBusy(true);
+    const { error } = await supabase().rpc('imposta_prezzo', {
+      p_lavoro_id: lavoro.id, p_prezzo_cent: c, p_motivo_gratuito: c === 0 ? 'Omaggio' : null,
+    });
+    setBusy(false);
+    if (error) return toast(erroreMsg(error), 'errore');
+    refresh();
+    onFatto();
+  }
+  return (
+    <div className="row gap8">
+      <input className="input input-sm num" style={{ flex: 1, width: 'auto', textAlign: 'left' }} inputMode="decimal"
+        placeholder="Prezzo €" aria-label={`Prezzo ${lavoro.codice}`} value={v} onChange={(e) => setV(e.target.value)} />
+      <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={salva}>Imposta prezzo</button>
+    </div>
+  );
+}
 
 export default function RitiroModal({ lavori, preselezione, onClose, onDone }) {
   const { toast, refresh } = useApp();
@@ -146,7 +170,7 @@ export default function RitiroModal({ lavori, preselezione, onClose, onDone }) {
                     </span>
                   </label>
                   <Chips l={l} />
-                  {bloccata && <Link className="small" href={`/lavori/${l.id}`}>Prima imposta il prezzo</Link>}
+                  {bloccata && <PrezzoVeloce lavoro={l} onFatto={() => setSel((s) => (s.includes(l.id) ? s : [...s, l.id]))} />}
                 </div>
               );
             })}

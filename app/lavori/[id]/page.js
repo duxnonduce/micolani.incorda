@@ -5,14 +5,13 @@ import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import Shell from '@/components/Shell';
 import { useApp } from '@/components/AppProvider';
-import DatiTecnici, { tecniciDaLavoro, tecniciPerDb } from '@/components/DatiTecnici';
 import PagamentoModal from '@/components/PagamentoModal';
 import PrezzoModal from '@/components/PrezzoModal';
 import RitiroModal from '@/components/RitiroModal';
 import { Caricamento, Campo, Chips } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import {
-  data, dataOra, erroreMsg, euro, fromLocalInput, nomeCliente, nuovoId, parseEuro, racchettaNome, testo, toLocalInput,
+  data, dataOra, erroreMsg, euro, nomeCliente, nuovoId, numToInput, parseEuro, parseNum, racchettaNome, testo,
 } from '@/lib/format';
 
 const ETICHETTE_STATO = { attesa: 'in attesa', lavorazione: 'in lavorazione', pronta: 'pronta', annullata: 'annullata' };
@@ -50,17 +49,16 @@ function descriviEvento(e, nomeOperatore) {
 
 export default function SchedaLavoro() {
   const { id } = useParams();
-  const { session, profilo, has, tick, toast, refresh, nomeOperatore, operatori } = useApp();
+  const { session, profilo, has, tick, toast, refresh, nomeOperatore } = useApp();
   const [l, setL] = useState(null);
   const [mancante, setMancante] = useState(false);
   const [lavoriConto, setLavoriConto] = useState([]);
   const [pagamenti, setPagamenti] = useState([]);
   const [eventi, setEventi] = useState([]);
   const [tec, setTec] = useState(null);
-  const [serv, setServ] = useState(null);
   const [modal, setModal] = useState(null);
   const [busy, setBusy] = useState(false);
-  const modificato = useRef({ tec: false, serv: false });
+  const modificato = useRef({ tec: false });
 
   useEffect(() => {
     if (!session || !profilo) return;
@@ -70,11 +68,10 @@ export default function SchedaLavoro() {
       if (error) return toast(erroreMsg(error), 'errore');
       if (!lav) return setMancante(true);
       setL(lav);
-      if (!modificato.current.tec) setTec(tecniciDaLavoro(lav));
-      if (!modificato.current.serv) {
-        setServ({
-          consegna_prevista: toLocalInput(lav.consegna_prevista), priorita: lav.priorita, note_interne: lav.note_interne || '',
-          posizione: lav.posizione || '', incordatore_id: lav.incordatore_id || '', consegnata_at: toLocalInput(lav.consegnata_at),
+      if (!modificato.current.tec) {
+        setTec({
+          corde: [lav.vert_marca, lav.vert_modello, lav.vert_calibro].filter(Boolean).join(' '),
+          tensione: numToInput(lav.tensione_vert ?? lav.tensione_oriz),
         });
       }
       const [lc, pl, ev] = await Promise.all([
@@ -103,30 +100,20 @@ export default function SchedaLavoro() {
   }
 
   async function salvaTecnici() {
-    const { dati, errore } = tecniciPerDb(tec);
-    if (errore) return toast(errore, 'errore');
+    const t = parseNum(tec.tensione);
+    if (Number.isNaN(t) || (t !== null && (t < 5 || t > 40))) return toast('La tensione deve essere tra 5 e 40 kg', 'errore');
+    const corde = testo(tec.corde);
+    const dati = {
+      vert_marca: corde, vert_modello: null, vert_calibro: null,
+      oriz_marca: corde, oriz_modello: null, oriz_calibro: null,
+      tensione_vert: t, tensione_oriz: t,
+    };
     setBusy(true);
     const { error } = await supabase().from('lavori').update(dati).eq('id', id);
     setBusy(false);
     if (error) return toast(erroreMsg(error), 'errore');
     modificato.current.tec = false;
     toast('Dati tecnici salvati');
-    refresh();
-  }
-
-  async function salvaServizio() {
-    const dati = { posizione: testo(serv.posizione), incordatore_id: serv.incordatore_id || null };
-    if (has('segreteria')) {
-      Object.assign(dati, { priorita: serv.priorita, note_interne: testo(serv.note_interne) });
-      if (serv.consegna_prevista !== toLocalInput(l.consegna_prevista)) dati.consegna_prevista = fromLocalInput(serv.consegna_prevista);
-      if (serv.consegnata_at && serv.consegnata_at !== toLocalInput(l.consegnata_at)) dati.consegnata_at = fromLocalInput(serv.consegnata_at);
-    }
-    setBusy(true);
-    const { error } = await supabase().from('lavori').update(dati).eq('id', id);
-    setBusy(false);
-    if (error) return toast(erroreMsg(error), 'errore');
-    modificato.current.serv = false;
-    toast('Dettagli salvati');
     refresh();
   }
 
@@ -165,11 +152,10 @@ export default function SchedaLavoro() {
   }
 
   if (mancante) return <Shell title="Lavoro" back="/lavori"><div className="card"><p>Lavoro non trovato.</p></div></Shell>;
-  if (!l || !tec || !serv) return <Shell title="Lavoro" back="/lavori"><Caricamento /></Shell>;
+  if (!l || !tec) return <Shell title="Lavoro" back="/lavori"><Caricamento /></Shell>;
 
   const annullata = l.stato_lavoro === 'annullata';
   const puoTecnici = (has('incordatore') || has('segreteria')) && (!annullata || has('admin'));
-  const incordatori = operatori.filter((o) => o.ruoli?.includes('incordatore') || o.ruoli?.includes('admin'));
 
   return (
     <Shell title={l.codice} back="/lavori">
@@ -187,14 +173,8 @@ export default function SchedaLavoro() {
         {annullata && <div className="errore">Annullato: {l.motivo_annullamento}</div>}
 
         <div className="azioni">
-          {has('incordatore') && l.stato_lavoro === 'attesa' && (
-            <button className="btn btn-outline" disabled={busy} onClick={() => cambiaStato('lavorazione')}>Inizia</button>
-          )}
-          {has('incordatore') && ['attesa', 'lavorazione'].includes(l.stato_lavoro) && (
-            <button className="btn btn-primary" disabled={busy} onClick={() => cambiaStato('pronta')}>Segna come pronta</button>
-          )}
-          {has('incordatore') && l.stato_lavoro === 'lavorazione' && (
-            <button className="btn btn-ghost" disabled={busy} onClick={() => cambiaStato('attesa')}>Rimetti in attesa</button>
+          {['attesa', 'lavorazione'].includes(l.stato_lavoro) && (
+            <button className="btn btn-primary" disabled={busy} onClick={() => cambiaStato('pronta')}>Pronta</button>
           )}
           {has('segreteria') && !l.ritirato && (
             <button className="btn btn-primary" onClick={() => setModal('ritiro')}>Registra ritiro</button>
@@ -246,51 +226,19 @@ export default function SchedaLavoro() {
       </section>
 
       <section className="card">
-        <h2 className="h2">Dati tecnici</h2>
-        <DatiTecnici value={tec} disabled={!puoTecnici} onChange={(v) => { modificato.current.tec = true; setTec(v); }} />
-        {puoTecnici && <button className="btn btn-primary" disabled={busy} onClick={salvaTecnici}>Salva dati tecnici</button>}
-      </section>
-
-      <section className="card">
-        <h2 className="h2">Dettagli</h2>
+        <h2 className="h2">Racchetta</h2>
+        <span>{[l.racchetta_marca, l.racchetta_modello, l.racchetta_identificazione].filter(Boolean).join(' ') || 'Marca e modello non indicati'}</span>
         <div className="grid2">
-          <Campo label="Consegnata al circolo">
-            <input type="datetime-local" className="input" disabled={!has('segreteria')} value={serv.consegnata_at}
-              onChange={(e) => { modificato.current.serv = true; setServ({ ...serv, consegnata_at: e.target.value }); }} />
+          <Campo label="Corde">
+            <input className="input" disabled={!puoTecnici} value={tec.corde} onChange={(e) => { modificato.current.tec = true; setTec({ ...tec, corde: e.target.value }); }} />
           </Campo>
-          <Campo label="Consegna prevista">
-            <input type="datetime-local" className="input" disabled={!has('segreteria')} value={serv.consegna_prevista}
-              onChange={(e) => { modificato.current.serv = true; setServ({ ...serv, consegna_prevista: e.target.value }); }} />
-          </Campo>
-          <Campo label="Priorità">
-            <select className="input" disabled={!has('segreteria')} value={serv.priorita}
-              onChange={(e) => { modificato.current.serv = true; setServ({ ...serv, priorita: e.target.value }); }}>
-              <option value="normale">Normale</option>
-              <option value="urgente">Urgente</option>
-            </select>
-          </Campo>
-          <Campo label="Incordatore">
-            <select className="input" value={serv.incordatore_id}
-              onChange={(e) => { modificato.current.serv = true; setServ({ ...serv, incordatore_id: e.target.value }); }}>
-              <option value="">Non assegnato</option>
-              {incordatori.map((o) => <option key={o.id} value={o.id}>{[o.nome, o.cognome].filter(Boolean).join(' ') || o.email}</option>)}
-            </select>
-          </Campo>
-          <Campo label="Posizione">
-            <input className="input" value={serv.posizione} placeholder="Es. scaffale 2"
-              onChange={(e) => { modificato.current.serv = true; setServ({ ...serv, posizione: e.target.value }); }} />
+          <Campo label="Tensione (kg)">
+            <input className="input num" inputMode="decimal" disabled={!puoTecnici} value={tec.tensione} onChange={(e) => { modificato.current.tec = true; setTec({ ...tec, tensione: e.target.value }); }} />
           </Campo>
         </div>
-        {has('segreteria') && (
-          <Campo label="Note interne">
-            <textarea className="input" rows={2} value={serv.note_interne}
-              onChange={(e) => { modificato.current.serv = true; setServ({ ...serv, note_interne: e.target.value }); }} />
-          </Campo>
-        )}
-        <button className="btn btn-outline" disabled={busy} onClick={salvaServizio}>Salva dettagli</button>
+        {puoTecnici && <button className="btn btn-outline" disabled={busy} onClick={salvaTecnici}>Salva corde e tensione</button>}
         <dl className="kv">
           <dt>Inserito</dt><dd>{dataOra(l.created_at)}, {nomeOperatore(l.created_by)}</dd>
-          {l.iniziato_at && <><dt>Iniziato</dt><dd>{dataOra(l.iniziato_at)}, {nomeOperatore(l.iniziato_by)}</dd></>}
           {l.pronta_at && <><dt>Pronta</dt><dd>{dataOra(l.pronta_at)}, {nomeOperatore(l.pronta_by)}</dd></>}
           {l.ritirato && <><dt>Ritirata</dt><dd>{dataOra(l.ritirato_at)}, consegnata da {nomeOperatore(l.ritirato_by)}{l.ritirato_da_nome ? `, ritirata da ${l.ritirato_da_nome}` : ''}</dd></>}
           {l.ritiro_note && <><dt>Note ritiro</dt><dd>{l.ritiro_note}</dd></>}
