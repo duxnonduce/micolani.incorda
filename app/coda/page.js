@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import Shell from '@/components/Shell';
 import { useApp } from '@/components/AppProvider';
 import { Caricamento, Vuoto } from '@/components/ui';
+import ProntaModal from '@/components/ProntaModal';
 import { supabase } from '@/lib/supabase';
 import { cordeTesto, dataBreve, erroreMsg } from '@/lib/format';
 
@@ -18,9 +19,9 @@ function nomeRacchetta(l) {
 }
 
 export default function Coda() {
-  const { session, profilo, tick, toast, refresh } = useApp();
+  const { session, profilo, tick, toast } = useApp();
   const [lavori, setLavori] = useState(null);
-  const [busy, setBusy] = useState(null);
+  const [pronta, setPronta] = useState(null);
 
   useEffect(() => {
     if (!session || !profilo) return;
@@ -30,15 +31,6 @@ export default function Coda() {
         setLavori((data || []).sort(ordina));
       });
   }, [session, profilo, tick, toast]);
-
-  async function pronta(l) {
-    setBusy(l.id);
-    const { error } = await supabase().rpc('cambia_stato_lavoro', { p_lavoro_id: l.id, p_stato: 'pronta' });
-    setBusy(null);
-    if (error) return toast(erroreMsg(error), 'errore');
-    toast(`${l.cliente_nome} ${l.cliente_cognome}: pronta`, 'pronta');
-    refresh();
-  }
 
   return (
     <Shell title={`In attesa${lavori ? ` (${lavori.length})` : ''}`} ruolo={['incordatore', 'segreteria']}>
@@ -52,11 +44,10 @@ export default function Coda() {
             <span className="strong" style={{ fontSize: 17, marginTop: 4 }}>{cordeTesto(l) || <span className="muted">Corde e tensione non indicate</span>}</span>
             <span className="small muted" style={{ marginTop: 2 }}>Lasciata il {dataBreve(l.consegnata_at)}</span>
           </Link>
-          <button className="btn btn-primary btn-big" disabled={busy === l.id} onClick={() => pronta(l)}>
-            {busy === l.id ? 'Salvataggio…' : 'Pronta'}
-          </button>
+          <button className="btn btn-primary btn-big" onClick={() => setPronta(l)}>Pronta</button>
         </article>
       ))}
+      {pronta && <ProntaModal lavoro={pronta} onClose={() => setPronta(null)} onDone={() => setPronta(null)} />}
     </Shell>
   );
 }

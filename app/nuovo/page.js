@@ -9,7 +9,7 @@ import { Caricamento, Campo } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { corrisponde, erroreMsg, nuovoId, paroleRicerca, parseNum, testo } from '@/lib/format';
 
-const vuota = { marca: '', modello: '', corde: '', tensione: '' };
+const vuota = { marca: '', modello: '', corde: '', tv: '', to: '' };
 
 function CercaCliente({ onScelto }) {
   const [q, setQ] = useState('');
@@ -75,8 +75,9 @@ function Nuovo() {
   async function salva(altra) {
     setErrore('');
     if (!cliente) return setErrore('Scegli il cliente.');
-    const tensione = parseNum(r.tensione);
-    if (Number.isNaN(tensione) || (tensione !== null && (tensione < 5 || tensione > 40))) {
+    const tv = parseNum(r.tv);
+    const to = parseNum(r.to);
+    if ([tv, to].some((t) => Number.isNaN(t) || (t !== null && (t < 5 || t > 40)))) {
       return setErrore('La tensione deve essere un numero in kg, tra 5 e 40.');
     }
     const corde = testo(r.corde);
@@ -87,7 +88,7 @@ function Nuovo() {
       p_lavori: [{
         racchetta: { marca: testo(r.marca), modello: testo(r.modello) },
         vert_marca: corde, oriz_marca: corde,
-        tensione_vert: tensione, tensione_oriz: tensione,
+        tensione_vert: tv, tensione_oriz: to,
       }],
     });
     setBusy(false);
@@ -120,7 +121,10 @@ function Nuovo() {
               <Campo label="Modello"><input className="input" value={r.modello} onChange={set('modello')} placeholder="Pure Aero" /></Campo>
             </div>
             <Campo label="Corde"><input className="input" value={r.corde} onChange={set('corde')} placeholder="RPM Blast 1.25" /></Campo>
-            <Campo label="Tensione (kg)"><input className="input input-big num" inputMode="decimal" value={r.tensione} onChange={set('tensione')} placeholder="24" /></Campo>
+            <div className="grid2">
+              <Campo label="Verticali (kg)"><input className="input input-big num" inputMode="decimal" value={r.tv} onChange={set('tv')} placeholder="24" /></Campo>
+              <Campo label="Orizzontali (kg)"><input className="input input-big num" inputMode="decimal" value={r.to} onChange={set('to')} placeholder="23" /></Campo>
+            </div>
           </section>
 
           {errore && <div className="errore">{errore}</div>}

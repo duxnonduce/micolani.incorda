@@ -8,6 +8,7 @@ import { useApp } from '@/components/AppProvider';
 import PagamentoModal from '@/components/PagamentoModal';
 import PrezzoModal from '@/components/PrezzoModal';
 import RitiroModal from '@/components/RitiroModal';
+import ProntaModal from '@/components/ProntaModal';
 import { Caricamento, Campo, Chips } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import {
@@ -71,7 +72,8 @@ export default function SchedaLavoro() {
       if (!modificato.current.tec) {
         setTec({
           corde: [lav.vert_marca, lav.vert_modello, lav.vert_calibro].filter(Boolean).join(' '),
-          tensione: numToInput(lav.tensione_vert ?? lav.tensione_oriz),
+          tv: numToInput(lav.tensione_vert),
+          to: numToInput(lav.tensione_oriz),
         });
       }
       const [lc, pl, ev] = await Promise.all([
@@ -100,13 +102,14 @@ export default function SchedaLavoro() {
   }
 
   async function salvaTecnici() {
-    const t = parseNum(tec.tensione);
-    if (Number.isNaN(t) || (t !== null && (t < 5 || t > 40))) return toast('La tensione deve essere tra 5 e 40 kg', 'errore');
+    const tv = parseNum(tec.tv);
+    const to = parseNum(tec.to);
+    if ([tv, to].some((t) => Number.isNaN(t) || (t !== null && (t < 5 || t > 40)))) return toast('La tensione deve essere tra 5 e 40 kg', 'errore');
     const corde = testo(tec.corde);
     const dati = {
       vert_marca: corde, vert_modello: null, vert_calibro: null,
       oriz_marca: corde, oriz_modello: null, oriz_calibro: null,
-      tensione_vert: t, tensione_oriz: t,
+      tensione_vert: tv, tensione_oriz: to,
     };
     setBusy(true);
     const { error } = await supabase().from('lavori').update(dati).eq('id', id);
@@ -174,7 +177,7 @@ export default function SchedaLavoro() {
 
         <div className="azioni">
           {['attesa', 'lavorazione'].includes(l.stato_lavoro) && (
-            <button className="btn btn-primary" disabled={busy} onClick={() => cambiaStato('pronta')}>Pronta</button>
+            <button className="btn btn-primary" onClick={() => setModal('pronta')}>Pronta</button>
           )}
           {has('segreteria') && !l.ritirato && (
             <button className="btn btn-primary" onClick={() => setModal('ritiro')}>Registra ritiro</button>
@@ -228,15 +231,18 @@ export default function SchedaLavoro() {
       <section className="card">
         <h2 className="h2">Racchetta</h2>
         <span>{[l.racchetta_marca, l.racchetta_modello, l.racchetta_identificazione].filter(Boolean).join(' ') || 'Marca e modello non indicati'}</span>
+        <Campo label="Corde">
+          <input className="input" disabled={!puoTecnici} value={tec.corde} onChange={(e) => { modificato.current.tec = true; setTec({ ...tec, corde: e.target.value }); }} />
+        </Campo>
         <div className="grid2">
-          <Campo label="Corde">
-            <input className="input" disabled={!puoTecnici} value={tec.corde} onChange={(e) => { modificato.current.tec = true; setTec({ ...tec, corde: e.target.value }); }} />
+          <Campo label="Verticali (kg)">
+            <input className="input num" inputMode="decimal" disabled={!puoTecnici} value={tec.tv} onChange={(e) => { modificato.current.tec = true; setTec({ ...tec, tv: e.target.value }); }} />
           </Campo>
-          <Campo label="Tensione (kg)">
-            <input className="input num" inputMode="decimal" disabled={!puoTecnici} value={tec.tensione} onChange={(e) => { modificato.current.tec = true; setTec({ ...tec, tensione: e.target.value }); }} />
+          <Campo label="Orizzontali (kg)">
+            <input className="input num" inputMode="decimal" disabled={!puoTecnici} value={tec.to} onChange={(e) => { modificato.current.tec = true; setTec({ ...tec, to: e.target.value }); }} />
           </Campo>
         </div>
-        {puoTecnici && <button className="btn btn-outline" disabled={busy} onClick={salvaTecnici}>Salva corde e tensione</button>}
+        {puoTecnici && <button className="btn btn-outline" disabled={busy} onClick={salvaTecnici}>Salva corde e tensioni</button>}
         <dl className="kv">
           <dt>Inserito</dt><dd>{dataOra(l.created_at)}, {nomeOperatore(l.created_by)}</dd>
           {l.pronta_at && <><dt>Pronta</dt><dd>{dataOra(l.pronta_at)}, {nomeOperatore(l.pronta_by)}</dd></>}
@@ -267,6 +273,7 @@ export default function SchedaLavoro() {
         ))}
       </section>
 
+      {modal === 'pronta' && <ProntaModal lavoro={l} onClose={() => setModal(null)} onDone={() => setModal(null)} />}
       {modal === 'prezzo' && <PrezzoModal lavoro={l} onClose={() => setModal(null)} onDone={() => setModal(null)} />}
       {modal === 'pagamento' && <PagamentoModal contoId={l.conto_id} lavori={lavoriConto} onClose={() => setModal(null)} onDone={() => setModal(null)} />}
       {modal === 'ritiro' && <RitiroModal lavori={lavoriConto.filter((x) => x.cliente_id === l.cliente_id)} preselezione={[l.id]} onClose={() => setModal(null)} onDone={() => setModal(null)} />}
