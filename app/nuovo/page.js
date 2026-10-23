@@ -23,7 +23,6 @@ function nuovaRiga(base) {
     identificazione: '',
     tec: base?.tec ? { ...base.tec } : tecniciVuoti(),
     prezzo: base?.prezzo ?? '',
-    daDefinire: base?.daDefinire ?? false,
     motivo_gratuito: '',
     priorita: base?.priorita || 'normale',
     consegna_prevista: base?.consegna_prevista || '',
@@ -121,7 +120,7 @@ function Nuovo() {
     setRighe([...righe.map((r) => ({ ...r, aperta: false })), nuovaRiga({
       marca: ultima.racchetta_id ? '' : ultima.marca,
       modello: ultima.racchetta_id ? '' : ultima.modello,
-      tec: ultima.tec, prezzo: ultima.prezzo, daDefinire: ultima.daDefinire,
+      tec: ultima.tec, prezzo: ultima.prezzo,
       priorita: ultima.priorita, consegna_prevista: ultima.consegna_prevista, incordatore_id: ultima.incordatore_id,
     })]);
   }
@@ -133,22 +132,18 @@ function Nuovo() {
     for (let i = 0; i < righe.length; i++) {
       const r = righe[i];
       const n = righe.length > 1 ? `Racchetta ${i + 1}: ` : '';
-      if (!r.racchetta_id && !testo(r.identificazione)) return setErrore(`${n}indica come riconoscerla (colore, numero, grip…).`);
       const { dati, errore: e } = tecniciPerDb(r.tec);
       if (e) return setErrore(n + e);
-      let prezzo = null;
-      if (!r.daDefinire) {
-        prezzo = parseEuro(r.prezzo);
-        if (prezzo === null || Number.isNaN(prezzo)) return setErrore(`${n}inserisci il prezzo oppure segna "da definire".`);
-        if (prezzo === 0 && !testo(r.motivo_gratuito)) return setErrore(`${n}per un lavoro gratuito indica il motivo.`);
-      }
+      // prezzo vuoto = da definire
+      const prezzo = parseEuro(r.prezzo);
+      if (Number.isNaN(prezzo)) return setErrore(`${n}il prezzo non è un numero valido.`);
       payload.push({
         ...(r.racchetta_id
           ? { racchetta_id: r.racchetta_id }
-          : { racchetta: { marca: testo(r.marca), modello: testo(r.modello), identificazione: r.identificazione.trim() } }),
+          : { racchetta: { marca: testo(r.marca), modello: testo(r.modello), identificazione: testo(r.identificazione) } }),
         ...dati,
         prezzo_cent: prezzo,
-        motivo_gratuito: prezzo === 0 ? testo(r.motivo_gratuito) : null,
+        motivo_gratuito: prezzo === 0 ? testo(r.motivo_gratuito) || 'Omaggio' : null,
         priorita: r.priorita,
         consegna_prevista: fromLocalInput(r.consegna_prevista),
         note_interne: testo(r.note_interne),
@@ -196,8 +191,10 @@ function Nuovo() {
 
           {!r.aperta ? (
             <span className="small">
-              {r.racchetta_id ? (racchette.find((x) => x.id === r.racchetta_id)?.identificazione || 'Racchetta esistente') : [r.marca, r.modello, r.identificazione].filter(Boolean).join(' ')}
-              {', '}{r.daDefinire ? 'prezzo da definire' : r.prezzo ? `${r.prezzo} €` : 'senza prezzo'}
+              {r.racchetta_id
+                ? (() => { const x = racchette.find((y) => y.id === r.racchetta_id); return x ? [x.marca, x.modello, x.identificazione].filter(Boolean).join(' ') || 'Racchetta registrata' : 'Racchetta registrata'; })()
+                : [r.marca, r.modello, r.identificazione].filter(Boolean).join(' ') || 'Racchetta'}
+              {', '}{testo(r.prezzo) ? `${r.prezzo} €` : 'prezzo da definire'}
             </span>
           ) : (
             <>
@@ -206,7 +203,7 @@ function Nuovo() {
                   <select className="input" value={r.racchetta_id} onChange={(e) => scegliRacchetta(r, e.target.value)}>
                     <option value="">Nuova racchetta</option>
                     {racchette.map((x) => (
-                      <option key={x.id} value={x.id}>{[x.marca, x.modello].filter(Boolean).join(' ')} {x.identificazione}</option>
+                      <option key={x.id} value={x.id}>{[x.marca, x.modello, x.identificazione].filter(Boolean).join(' ') || 'Racchetta senza dettagli'}</option>
                     ))}
                   </select>
                 </Campo>
@@ -215,26 +212,19 @@ function Nuovo() {
                 <div className="grid3">
                   <Campo label="Marca"><input className="input" value={r.marca} onChange={(e) => aggiorna(r.key, { marca: e.target.value })} /></Campo>
                   <Campo label="Modello"><input className="input" value={r.modello} onChange={(e) => aggiorna(r.key, { modello: e.target.value })} /></Campo>
-                  <Campo label="Come riconoscerla *"><input className="input" value={r.identificazione} placeholder="Colore, numero…" onChange={(e) => aggiorna(r.key, { identificazione: e.target.value })} /></Campo>
+                  <Campo label="Come riconoscerla"><input className="input" value={r.identificazione} placeholder="Colore, numero…" onChange={(e) => aggiorna(r.key, { identificazione: e.target.value })} /></Campo>
                 </div>
               )}
 
               <DatiTecnici value={r.tec} onChange={(tec) => aggiorna(r.key, { tec })} />
-              <span className="small muted">I dati tecnici si possono completare dopo, ma servono prima di iniziare il lavoro.</span>
 
-              <div className="grid2">
-                <Campo label="Prezzo">
-                  <input className="input input-big num" inputMode="decimal" disabled={r.daDefinire} value={r.daDefinire ? '' : r.prezzo}
-                    placeholder={r.daDefinire ? 'Da definire' : '0,00'} onChange={(e) => aggiorna(r.key, { prezzo: e.target.value })} />
-                </Campo>
-                <label className="check-label" style={{ alignSelf: 'end' }}>
-                  <input type="checkbox" checked={r.daDefinire} onChange={(e) => aggiorna(r.key, { daDefinire: e.target.checked })} />
-                  <span>Prezzo da definire</span>
-                </label>
-              </div>
-              {!r.daDefinire && parseEuro(r.prezzo) === 0 && (
-                <Campo label="Motivo del lavoro gratuito">
-                  <input className="input" value={r.motivo_gratuito} onChange={(e) => aggiorna(r.key, { motivo_gratuito: e.target.value })} placeholder="Es. omaggio, garanzia" />
+              <Campo label="Prezzo" nota="Se lo lasci vuoto resta da definire">
+                <input className="input input-big num" inputMode="decimal" value={r.prezzo}
+                  placeholder="Da definire" onChange={(e) => aggiorna(r.key, { prezzo: e.target.value })} />
+              </Campo>
+              {parseEuro(r.prezzo) === 0 && (
+                <Campo label="Motivo del lavoro gratuito" nota="Facoltativo">
+                  <input className="input" value={r.motivo_gratuito} onChange={(e) => aggiorna(r.key, { motivo_gratuito: e.target.value })} placeholder="Omaggio" />
                 </Campo>
               )}
 

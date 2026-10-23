@@ -41,14 +41,11 @@ begin
   for v_item in select value from jsonb_array_elements(p_lavori) loop
     v_racc := nullif(v_item ->> 'racchetta_id', '')::uuid;
     if v_racc is null then
-      if nullif(btrim(v_item -> 'racchetta' ->> 'identificazione'), '') is null then
-        raise exception 'Indica come riconoscere la racchetta (colore, numero…)';
-      end if;
       insert into public.racchette (cliente_id, marca, modello, identificazione, note)
       values (p_cliente_id,
               nullif(btrim(v_item -> 'racchetta' ->> 'marca'), ''),
               nullif(btrim(v_item -> 'racchetta' ->> 'modello'), ''),
-              btrim(v_item -> 'racchetta' ->> 'identificazione'),
+              nullif(btrim(v_item -> 'racchetta' ->> 'identificazione'), ''),
               nullif(btrim(v_item -> 'racchetta' ->> 'note'), ''))
       returning id into v_racc;
     end if;
@@ -80,7 +77,6 @@ begin
   perform public._salva_risultato(p_request_id, v_out);
   return v_out;
 end $$;
-
 
 revoke execute on function public.crea_lavori(uuid, uuid, jsonb) from public, anon;
 grant execute on function public.crea_lavori(uuid, uuid, jsonb) to authenticated;

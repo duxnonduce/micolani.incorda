@@ -222,7 +222,7 @@ create table public.racchette (
   cliente_id uuid not null references public.clienti(id),
   marca text,
   modello text,
-  identificazione text not null check (btrim(identificazione) <> ''),
+  identificazione text,
   note text,
   created_at timestamptz not null default now(),
   created_by uuid default auth.uid()
@@ -495,14 +495,11 @@ begin
   for v_item in select value from jsonb_array_elements(p_lavori) loop
     v_racc := nullif(v_item ->> 'racchetta_id', '')::uuid;
     if v_racc is null then
-      if nullif(btrim(v_item -> 'racchetta' ->> 'identificazione'), '') is null then
-        raise exception 'Indica come riconoscere la racchetta (colore, numero…)';
-      end if;
       insert into public.racchette (cliente_id, marca, modello, identificazione, note)
       values (p_cliente_id,
               nullif(btrim(v_item -> 'racchetta' ->> 'marca'), ''),
               nullif(btrim(v_item -> 'racchetta' ->> 'modello'), ''),
-              btrim(v_item -> 'racchetta' ->> 'identificazione'),
+              nullif(btrim(v_item -> 'racchetta' ->> 'identificazione'), ''),
               nullif(btrim(v_item -> 'racchetta' ->> 'note'), ''))
       returning id into v_racc;
     end if;
